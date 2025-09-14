@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=42"]
+requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -11,6 +11,21 @@ readme = "README.md"
 license = { text = "MIT" }
 dependencies = ["requests"]
 requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
 
 [project.urls]
-Homepage = "https://github.com/yourname/anubis-solver"
+Homepage = "https://github.com/huzpsb/anubis_solver_pypi"
+
+[tool.setuptools]
+packages = ["anubis_solver"]
+
+[tool.setuptools.package-data]
+anubis_solver = ["*.py"]

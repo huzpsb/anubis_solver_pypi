@@ -22,12 +22,31 @@ jobs:
       - name: Install build backend
         run: |
           python -m pip install --upgrade pip
-          pip install build twine
+          pip install build twine wheel
 
       - name: Build package
         run: python -m build
 
+      - name: List dist directory
+        run: ls -la dist/
+
+      - name: Check package with twine
+        run: twine check dist/*
+
+      - name: Extract and check wheel contents
+        run: |
+          mkdir -p temp_extract
+          cd temp_extract
+          unzip ../dist/*.whl
+          echo "=== Wheel contents ==="
+          find . -type f -name "*.py" | head -20
+          echo "=== METADATA file ==="
+          cat *.dist-info/METADATA || true
+          cd ..
+          rm -rf temp_extract
+
       - name: Publish to PyPI
+        if: success()
         uses: pypa/gh-action-pypi-publish@v1.8.10
         with:
           user: __token__
