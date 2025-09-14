@@ -9,6 +9,9 @@ on:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/anubis-solver/
 
     steps:
       - name: Checkout source
@@ -19,35 +22,64 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install build backend
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install build twine wheel
+          # 安装最新版本的构建工具
+          pip install --upgrade build twine wheel
+          # 但限制 setuptools 版本以避免 metadata 2.4 问题
+          pip install "setuptools>=42,<69"
 
       - name: Build package
-        run: python -m build
-
-      - name: List dist directory
-        run: ls -la dist/
-
-      - name: Check package with twine
-        run: twine check dist/*
-
-      - name: Extract and check wheel contents
         run: |
-          mkdir -p temp_extract
-          cd temp_extract
-          unzip ../dist/*.whl
-          echo "=== Wheel contents ==="
-          find . -type f -name "*.py" | head -20
-          echo "=== METADATA file ==="
-          cat *.dist-info/METADATA || true
-          cd ..
-          rm -rf temp_extract
+          # 清理旧的构建
+          rm -rf dist/ build/ *.egg-info
+          # 构建
+          python -m build
 
-      - name: Publish to PyPI
+      - name: Validate package
+        run: |
+          echo "=== Built packages ==="
+          ls -la dist/
+          
+          echo "=== Checking with twine ==="
+          python -m twine check dist/*
+          
+          echo "=== Twine version ==="
+          python -m twine --version
+          
+          echo "=== Setuptools version ==="
+          python -c "import setuptools; print(f'setuptools: {setuptools.__version__}')"
+
+      - name: Debug wheel contents
+        run: |
+          echo "=== Inspecting wheel contents ==="
+          python -m zipfile -l dist/*.whl
+          
+          echo "=== Extracting and checking METADATA ==="
+          mkdir -p temp_check
+          cd temp_check
+          unzip ../dist/*.whl '*.dist-info/METADATA'
+          echo "--- METADATA content ---"
+          cat *.dist-info/METADATA
+          echo "--- End METADATA ---"
+          cd ..
+          rm -rf temp_check
+
+      # 选项 A: 使用最新的 GitHub Action（尝试这个先）
+      - name: Publish to PyPI (Option A - GitHub Action)
         if: success()
-        uses: pypa/gh-action-pypi-publish@v1.8.10
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
+          verbose: true
+          print-hash: true
+
+      # 选项 B: 如果上面失败，取消注释下面的部分使用 twine 直接上传
+      # - name: Publish to PyPI (Option B - Direct twine)
+      #   if: success()
+      #   env:
+      #     TWINE_USERNAME: __token__
+      #     TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      #   run: |
+      #     python -m twine upload --repository pypi dist/* --verbose

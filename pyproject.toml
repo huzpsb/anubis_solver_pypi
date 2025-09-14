@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "anubis-solver"
 version = "0.1.0"
 description = "Solver for anti-bot challenges (Anubis / canine.tools style)"
-authors = [{ name="Your Name", email="you@example.com" }]
+authors = [{ name="huzpsb", email="noreply@example.com" }]
 readme = "README.md"
 license = { text = "MIT" }
 dependencies = ["requests"]
