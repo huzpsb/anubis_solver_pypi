@@ -1,35 +1,40 @@
-import re
-import time
-import requests
-import hashlib
 import concurrent.futures
+import re
+import requests
+import time
+from typing import Optional
+
 from .utils import sha256, bytes_to_hex
 
 
-def _fetch(url: str, cookie: str | None = None) -> tuple[str | None, str]:
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/58.0.3029.110 AnubisSolver/1.0"
-        ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,"
-                  "image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-    }
-    resp = requests.get(url, headers=headers, cookies={"cookie": cookie} if cookie else None, verify=False)
+def _fetch(url: str, cookie: Optional[str] = None) -> tuple[Optional[str], str]:
+    headers = {"User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                              "AppleWebKit/537.36 (KHTML, like Gecko) "
+                              "Chrome/58.0.3029.110 AnubisSolver/0.1.1 +https://pypi.org/project/anubis-solver/"),
+               "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+               "Accept-Language": "en-US,en;q=0.5", }
+    if cookie:
+        headers["Cookie"] = cookie
+
+    resp = requests.get(url, headers=headers, verify=False, allow_redirects=False)
     body = resp.text
 
     set_cookie = None
     if "Set-Cookie" in resp.headers:
         parts = []
-        for cookie_val in resp.headers.getlist("Set-Cookie"):
+        cookie_headers = []
+        if hasattr(resp.raw, '_original_response') and hasattr(resp.raw._original_response, 'msg'):
+            cookie_headers = resp.raw._original_response.msg.get_all('Set-Cookie') or []
+        else:
+            single_cookie = resp.headers.get("Set-Cookie")
+            if single_cookie:
+                cookie_headers = [single_cookie]
+        for cookie_val in cookie_headers:
             cookie_part = cookie_val.split(";", 1)[0]
             if not cookie_part.endswith("="):
                 parts.append(cookie_part)
         if parts:
             set_cookie = "; ".join(parts)
-
     return set_cookie, body
 
 
@@ -65,7 +70,6 @@ def solve(endpoint: str, sleep: float = 1.0) -> str:
     cookie, body = _fetch(endpoint)
 
     final_cookie = None
-
     try:
         if "\"algorithm\":\"metarefresh\"" in body:
             m = re.search(r"url=/([^\"<]+)", body)
@@ -75,7 +79,6 @@ def solve(endpoint: str, sleep: float = 1.0) -> str:
             time.sleep(sleep)
             c2, _ = _fetch(url, cookie)
             final_cookie = f"{cookie}; {c2}" if c2 else cookie
-
         elif "\"algorithm\":\"preact\"" in body:
             m_data = re.search(r"\"randomData\":\"([^\"]+)\"", body)
             m_id = re.search(r"\"id\":\"([^\"]+)\"", body)
@@ -83,14 +86,10 @@ def solve(endpoint: str, sleep: float = 1.0) -> str:
                 raise RuntimeError("preact challenge parse error")
             solved = bytes_to_hex(sha256(m_data.group(1)))
             time.sleep(sleep)
-            url = (
-                endpoint.rstrip("/") +
-                f".within.website/x/cmd/anubis/api/pass-challenge?"
-                f"id={m_id.group(1)}&result={solved}&redir=%2F"
-            )
+            url = (endpoint.rstrip("/") + f"/.within.website/x/cmd/anubis/api/pass-challenge?"
+                                          f"id={m_id.group(1)}&result={solved}&redir=%2F")
             c2, _ = _fetch(url, cookie)
             final_cookie = f"{cookie}; {c2}" if c2 else cookie
-
         else:  # assume PoW
             m_chal = re.search(r"\"challenge\":\"([^\"]+)\"", body)
             m_diff = re.search(r"\"difficulty\":(\d+)", body)
@@ -105,18 +104,10 @@ def solve(endpoint: str, sleep: float = 1.0) -> str:
             hash_hex = bytes_to_hex(h)
 
             time.sleep(sleep)
-            url = (
-                endpoint.rstrip("/") +
-                f".within.website/x/cmd/anubis/api/pass-challenge?"
-                f"response={hash_hex}&nonce={ans}&elapsedTime=10&redir=%2F"
-            )
+            url = (endpoint.rstrip("/") + f"/.within.website/x/cmd/anubis/api/pass-challenge?"
+                                          f"response={hash_hex}&nonce={ans}&elapsedTime=10&redir=%2F")
             c2, _ = _fetch(url, cookie)
             final_cookie = f"{cookie}; {c2}" if c2 else cookie
-
-    except Exception:
-        pass
-
-    if not final_cookie:
-        raise RuntimeError("Failed to obtain final cookie")
-
+    except Exception as e:
+        raise RuntimeError(f"Challenge solving failed: {e}")
     return final_cookie

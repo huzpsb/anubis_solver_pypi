@@ -1,10 +1,7 @@
-name: Publish Python 🐍 package
+name: Publish Python Package
 
 on:
-  push:
-    tags:
-      - "v*"   # 例如 v0.1.0 的 tag 才触发
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
 
 jobs:
   build-and-publish:
@@ -25,16 +22,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # 安装最新版本的构建工具
           pip install --upgrade build twine wheel
-          # 但限制 setuptools 版本以避免 metadata 2.4 问题
           pip install "setuptools>=42,<69"
 
       - name: Build package
         run: |
-          # 清理旧的构建
           rm -rf dist/ build/ *.egg-info
-          # 构建
           python -m build
 
       - name: Validate package
@@ -66,20 +59,10 @@ jobs:
           cd ..
           rm -rf temp_check
 
-      # 选项 A: 使用最新的 GitHub Action（尝试这个先）
-      - name: Publish to PyPI (Option A - GitHub Action)
+      - name: Publish to PyPI
         if: success()
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
           verbose: true
           print-hash: true
-
-      # 选项 B: 如果上面失败，取消注释下面的部分使用 twine 直接上传
-      # - name: Publish to PyPI (Option B - Direct twine)
-      #   if: success()
-      #   env:
-      #     TWINE_USERNAME: __token__
-      #     TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-      #   run: |
-      #     python -m twine upload --repository pypi dist/* --verbose
