@@ -2,7 +2,7 @@ import concurrent.futures
 import hashlib
 import os
 import re
-import requests
+import httpx2
 import time
 from typing import Optional
 
@@ -24,17 +24,17 @@ def _fetch(url: str, cookie: Optional[str] = None) -> tuple[Optional[str], str]:
     if cookie:
         headers["Cookie"] = cookie
 
-    resp = requests.get(url, headers=headers, verify=False, allow_redirects=False)
+    resp = httpx2.get(url, headers=headers, verify=False, follow_redirects=False)
     body = resp.text
 
     set_cookie = None
     if "Set-Cookie" in resp.headers:
         parts = []
         cookie_headers = []
-        if hasattr(resp.raw, "_original_response") and hasattr(
-            resp.raw._original_response, "msg"
+        if hasattr(resp.text, "_original_response") and hasattr(
+            resp.text._original_response, "msg"
         ):
-            cookie_headers = resp.raw._original_response.msg.get_all("Set-Cookie") or []
+            cookie_headers = resp.text._original_response.msg.get_all("Set-Cookie") or []
         else:
             single_cookie = resp.headers.get("Set-Cookie")
             if single_cookie:
@@ -77,7 +77,7 @@ def _solve_pow(challenge: str, difficulty: int, threads: int = os.cpu_count()) -
 
 
 def solve(endpoint: str, sleep: float = 1.0) -> str:
-    requests.packages.urllib3.disable_warnings()
+    # @todo Not working: httpx2.packages.urllib3.disable_warnings()
 
     cookie, body = _fetch(endpoint)
 
